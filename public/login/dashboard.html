@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Productos - Gestión</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; padding: 1rem; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+    h1 { color: #1a1a2e; }
+    .btn { padding: 0.5rem 1rem; border-radius: 8px; border: none; cursor: pointer; font-weight: 500; text-decoration: none; display: inline-block; }
+    .btn-primary { background: #0f3460; color: white; }
+    .btn-secondary { background: #6c757d; color: white; }
+    .btn-danger { background: #dc3545; color: white; }
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #1a1a2e; color: white; }
+    .msg { padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; }
+    .msg.error { background: #fee; color: #c00; }
+    .msg.success { background: #efe; color: #060; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Productos</h1>
+    <div>
+      <button class="btn btn-primary" id="btnNew">Nuevo producto</button>
+      <a href="/login/" class="btn btn-secondary">Cerrar sesión</a>
+    </div>
+  </div>
+  <div id="message"></div>
+  <table>
+    <thead><tr><th>Nombre</th><th>Descripción</th><th>Precio</th><th>Stock</th><th>Acciones</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) { window.location.href = '/login/'; }
+    const base = window.location.origin;
+    function showMsg(text, type) { const el = document.getElementById('message'); el.className = 'msg ' + (type || 'success'); el.textContent = text; el.style.display = 'block'; setTimeout(() => { el.style.display = 'none'; }, 4000); }
+    async function loadProducts() {
+      try {
+        const res = await fetch(base + '/api/products', { headers: { Authorization: 'Bearer ' + token } });
+        if (res.status === 401) { localStorage.removeItem('token'); window.location.href = '/login/'; return; }
+        const data = await res.json();
+        const tbody = document.getElementById('tbody');
+        tbody.innerHTML = (Array.isArray(data) ? data : []).map(p => '<tr><td>' + p.name + '</td><td>' + (p.description || '-') + '</td><td>' + p.price + '</td><td>' + (p.stock ?? '-') + '</td><td><button class="btn btn-secondary btn-edit" data-id="' + p._id + '">Editar</button> <button class="btn btn-danger btn-del" data-id="' + p._id + '">Eliminar</button></td></tr>').join('') || '<tr><td colspan="5">No hay productos.</td></tr>';
+        tbody.querySelectorAll('.btn-del').forEach(b => b.addEventListener('click', () => deleteProduct(b.dataset.id)));
+        tbody.querySelectorAll('.btn-edit').forEach(b => b.addEventListener('click', () => editProduct(b.dataset.id)));
+      } catch (e) { showMsg('Error al cargar productos.', 'error'); }
+    }
+    async function deleteProduct(id) {
+      if (!confirm('¿Eliminar este producto?')) return;
+      try {
+        const res = await fetch(base + '/api/products/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+        const data = await res.json();
+        if (!res.ok) { showMsg(data.error || 'Error', 'error'); return; }
+        showMsg('Producto eliminado.'); loadProducts();
+      } catch (e) { showMsg('Error al eliminar.', 'error'); }
+    }
+    function editProduct(id) { showMsg('Editar producto ' + id, 'success'); }
+    document.getElementById('btnNew').addEventListener('click', () => showMsg('Crear producto: POST /api/products con nombre, descripción, precio, stock.', 'success'));
+    loadProducts();
+  </script>
+</body>
+</html>
